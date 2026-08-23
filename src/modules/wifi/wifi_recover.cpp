@@ -788,6 +788,35 @@ static bool verify_mic(const HandshakeData &hs, const uint8_t *ptk) {
     return memcmp(computed_mic, hs.mic, 16) == 0;
 }
 
+static bool save_recovered_password(FS &fs, const HandshakeData &hs, const char *password) {
+    const String recovery_dir = "/BruceRecovery";
+    const String recovery_file = recovery_dir + "/recovery.txt";
+
+    if (!fs.exists(recovery_dir) && !fs.mkdir(recovery_dir)) return false;
+
+    File file = fs.open(recovery_file, FILE_APPEND);
+    if (!file) return false;
+
+    file.println("========================================");
+    file.println("           WiFi Recovery Result");
+    file.println("========================================");
+    file.printf("Network : %s\n", hs.ssid[0] ? hs.ssid : "(unknown)");
+    file.printf(
+        "BSSID   : %02X:%02X:%02X:%02X:%02X:%02X\n",
+        hs.ap_mac[0],
+        hs.ap_mac[1],
+        hs.ap_mac[2],
+        hs.ap_mac[3],
+        hs.ap_mac[4],
+        hs.ap_mac[5]
+    );
+    file.printf("Password: %s\n", password);
+    file.println("========================================");
+    file.println();
+    file.close();
+    return true;
+}
+
 /* ─────────────────────────────────────────────────────────────
    Dual-core cracking via FreeRTOS queue
 ───────────────────────────────────────────────────────────── */
@@ -1083,6 +1112,7 @@ void wifi_crack_handshake(const String &wordlist_path, const String &pcap_path) 
     wf.close();
 
     if (shared.found) {
+        bool saved = save_recovered_password(*fs, hs, shared.found_pw);
         resetTftDisplay();
         drawMainBorderWithTitle("WiFi Password Cracker", true);
         padprintln("");
@@ -1101,6 +1131,7 @@ void wifi_crack_handshake(const String &wordlist_path, const String &pcap_path) 
                 display_pw.substring(0, 14) + "..." + display_pw.substring(display_pw.length() - tail);
         }
         padprintf("Password: %s\n", display_pw.c_str());
+        padprintln(saved ? "Saved to BruceRecovery/recovery.txt" : "Save failed");
         padprintln("");
         padprintln("Press any key to continue...");
         while (!check(AnyKeyPress)) vTaskDelay(pdMS_TO_TICKS(50));
