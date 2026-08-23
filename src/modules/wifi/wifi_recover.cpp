@@ -808,7 +808,9 @@ static bool save_recovered_password(FS &fs, const HandshakeData &hs, const char 
         hs.ap_mac[4],
         hs.ap_mac[5]
     );
-    file.printf("Password: %s\n\n", password);
+    file.printf("Password: %s\n", password);
+    file.println();
+    file.println();
     file.close();
     return true;
 }
@@ -1173,7 +1175,7 @@ void wifi_recover_menu() {
     const String PCAP_DIR = "/BrucePCAP";
     if (!(*fs).exists(PCAP_DIR)) {
         if ((*fs).mkdir(PCAP_DIR)) padprintf("Created: %s\n", PCAP_DIR.c_str());
-        else padprintf("Warning: failed to create %s\n", PC_DIR.c_str()); // Note: corrected trailing context
+        else padprintf("Warning: failed to create %s\n", PCAP_DIR.c_str());
     }
 
     resetTftDisplay();
