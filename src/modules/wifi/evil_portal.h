@@ -5,6 +5,7 @@
 #include <ESPAsyncWebServer.h>
 #include <globals.h>
 #include <WiFiType.h>
+#include <vector>
 
 class EvilPortal {
     class CaptiveRequestHandler : public AsyncWebHandler {
@@ -89,6 +90,9 @@ private:
     bool _durationExtended = false;
     unsigned long _launchTime = 0;
     unsigned long _lastPageViewTime = 0;
+    
+    std::vector<String> chatHistory;
+    String escapeJson(const String& s);
 
     void portalController(AsyncWebServerRequest *request);
     void credsController(AsyncWebServerRequest *request);
