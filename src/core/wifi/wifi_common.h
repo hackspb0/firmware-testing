@@ -29,6 +29,11 @@ bool wifiConnectMenu(wifi_mode_t = WIFI_MODE_STA);
 bool wifiConnecttoKnownNet(void);
 
 /**
+ * @brief Connects to a saved Wi-Fi network and starts an internet-sharing AP
+ */
+bool wifiStartInternetAP();
+
+/**
  * @brief returns MAC adress
  */
 String checkMAC();
@@ -63,14 +68,16 @@ void ensureWifiPlatform();
 /**
  * @brief Connects to wifiNetwork
  */
-bool _wifiConnect(const String &ssid, int encryption, int32_t channel = 0, const uint8_t* bssid = nullptr);
-bool _connectToWifiNetwork(const String &ssid, const String &pwd, int32_t channel = 0, const uint8_t* bssid = nullptr);
+bool _wifiConnect(const String &ssid, int encryption, int32_t channel = 0, const uint8_t *bssid = nullptr);
+bool _connectToWifiNetwork(
+    const String &ssid, const String &pwd, int32_t channel = 0, const uint8_t *bssid = nullptr
+);
 
 /**
  * @brief sets up wifi in AP mode
  * @note wifi.mode should be set before calling the method
  */
-bool _setupAP();
+bool _setupAP(bool internetSharing = false);
 
 void updateTimezoneTask(void *pvParameters);
 
