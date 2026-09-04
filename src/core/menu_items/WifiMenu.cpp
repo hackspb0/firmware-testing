@@ -49,11 +49,21 @@ void WifiMenu::optionsMenu() {
     if (!WiFi.isConnected() && !WiFi.AP.started()) {
         options = {
             {"Connect to Wifi", lambdaHelper(wifiConnectMenu, WIFI_STA)},
-            {"Start WiFi AP", [=]() {
+            {"Start WiFi AP",
+             [=]() {
                  wifiConnectMenu(WIFI_AP);
                  displayInfo("pwd: " + bruceConfig.wifiAp.pwd, true);
              }},
+            {"Start AP with Internet", [=]() {
+                 wifiStartInternetAP();
+                 displayInfo("pwd: " + bruceConfig.wifiAp.pwd, true);
+             }},
         };
+    } else if (WiFi.isConnected() && !WiFi.AP.started()) {
+        options.push_back({"Start AP with Internet", [=]() {
+                               wifiStartInternetAP();
+                               displayInfo("pwd: " + bruceConfig.wifiAp.pwd, true);
+                           }});
     }
     if (WiFi.getMode() != WIFI_MODE_NULL) { options.push_back({"Turn Off WiFi", wifiDisconnect}); }
     if (WiFi.getMode() & WIFI_MODE_STA && WiFi.isConnected()) {
