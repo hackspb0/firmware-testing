@@ -54,13 +54,13 @@ void WifiMenu::optionsMenu() {
                  wifiConnectMenu(WIFI_AP);
                  displayInfo("pwd: " + bruceConfig.wifiAp.pwd, true);
              }},
-            {"Start AP with Internet", [=]() {
+            {"Internet AP", [=]() {
                  wifiStartInternetAP();
                  displayInfo("pwd: " + bruceConfig.wifiAp.pwd, true);
              }},
         };
     } else if (WiFi.isConnected() && !WiFi.AP.started()) {
-        options.push_back({"Start AP with Internet", [=]() {
+        options.push_back({"Internet AP", [=]() {
                                wifiStartInternetAP();
                                displayInfo("pwd: " + bruceConfig.wifiAp.pwd, true);
                            }});
