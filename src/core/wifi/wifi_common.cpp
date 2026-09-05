@@ -7,6 +7,7 @@
 #include "core/settings.h"
 #include "core/utils.h"
 #include "core/wifi/wifi_mac.h"
+#include "esp_err.h"
 #include "esp_wifi.h"
 #include "modules/ble/ble_common.h"
 #include <array>
@@ -194,7 +195,14 @@ bool _setupAP(bool internetSharing) {
 
     if (internetSharing) {
         esp_netif_t *apNetif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
-        if (apNetif == nullptr || esp_netif_napt_enable(apNetif) != ESP_OK) {
+        esp_err_t naptError = apNetif == nullptr ? ESP_ERR_NOT_FOUND : esp_netif_napt_enable(apNetif);
+        if (naptError != ESP_OK) {
+            Serial.printf(
+                "[WiFi] NAT enable failed: %s (0x%lx), AP netif=%p\n",
+                esp_err_to_name(naptError),
+                static_cast<unsigned long>(naptError),
+                apNetif
+            );
             WiFi.softAPdisconnect();
             displayError("Internet sharing unavailable");
             return false;
@@ -359,7 +367,63 @@ bool wifiConnectMenu(wifi_mode_t mode) {
 bool wifiStartInternetAP() {
     if (WiFi.getMode() & WIFI_MODE_AP) return true;
 
-    if (!WiFi.isConnected() && !wifiConnecttoKnownNet()) {
+    if (!radioHasMemForWifi()) {
+        displayError("Low RAM: free BLE/SD first", true);
+        return false;
+    }
+
+    WiFi.mode(WIFI_MODE_STA);
+    setConfiguredWifiHostname();
+    displayTextLine("Select Internet WiFi");
+    int networks = WiFi.scanNetworks();
+    String selectedSsid;
+    int selectedEncryption = WIFI_AUTH_OPEN;
+    int32_t selectedChannel = 0;
+    uint8_t selectedBssid[6] = {0};
+    bool selectedHidden = false;
+
+    options = {};
+    for (int i = 0; i < networks && options.size() < 250; i++) {
+        String ssid = WiFi.SSID(i);
+        int encryption = WiFi.encryptionType(i);
+        int32_t channel = WiFi.channel(i);
+        uint8_t *bssid = WiFi.BSSID(i);
+        std::array<uint8_t, 6> bssidArray = {};
+        if (bssid) memcpy(bssidArray.data(), bssid, 6);
+
+        String prefix = encryption == WIFI_AUTH_OPEN ? "" : "#";
+        String label = prefix + ssid + " (" + String(WiFi.RSSI(i)) + "|ch." + String(channel) + ")";
+        options.push_back(
+            {label.c_str(),
+             [&selectedSsid,
+              &selectedEncryption,
+              &selectedChannel,
+              &selectedBssid,
+              ssid,
+              encryption,
+              channel,
+              bssidArray]() {
+                 selectedSsid = ssid;
+                 selectedEncryption = encryption;
+                 selectedChannel = channel;
+                 memcpy(selectedBssid, bssidArray.data(), 6);
+             }}
+        );
+    }
+    WiFi.scanDelete();
+    options.push_back({"Hidden SSID", [&selectedHidden]() { selectedHidden = true; }});
+    addOptionToMainMenu();
+    loopOptions(options);
+    options.clear();
+
+    if (selectedHidden) {
+        selectedSsid = keyboard("", 32, "Your SSID");
+        if (selectedSsid != "\x1B") _wifiConnect(selectedSsid, WIFI_AUTH_WPA_PSK);
+    } else if (selectedSsid != "") {
+        _wifiConnect(selectedSsid, selectedEncryption, selectedChannel, selectedBssid);
+    }
+
+    if (!WiFi.isConnected()) {
         displayError("Internet WiFi unavailable", true);
         return false;
     }
