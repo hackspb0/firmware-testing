@@ -72,6 +72,7 @@ public:
     std::set<String> evilWifiNames = {};
     String wifiMAC = ""; //@IncursioHack
     bool TerminalLog = true;
+    std::set<String> deauthWhitelist = {}; // MACs spared by whitelist deauth, lowercase colon form
 
     // EvilPortal
     EvilPortalEndpoints evilPortalEndpoints = {"/creds", "/ssid", true, true, true};
@@ -209,6 +210,8 @@ public:
     void setBadUSBBLEShowOutput(bool value);
     void addDisabledMenu(String value);
     void removeDisabledMenu(String value);
+    void addDeauthWhitelistMac(String value);
+    void removeDeauthWhitelistMac(String value);
 
     void addWebUISession(const String &token);
     void removeWebUISession(const String &token);

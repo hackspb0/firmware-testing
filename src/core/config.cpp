@@ -79,6 +79,9 @@ JsonDocument BruceConfig::toJson() const {
     JsonArray dm = setting["disabledMenus"].to<JsonArray>();
     for (int i = 0; i < disabledMenus.size(); i++) { dm.add(disabledMenus[i]); }
 
+    JsonArray dw = setting["deauthWhitelist"].to<JsonArray>();
+    for (const auto &mac : deauthWhitelist) dw.add(mac);
+
     JsonArray qrArray = setting["qrCodes"].to<JsonArray>();
     for (const auto &entry : qrCodes) {
         JsonObject qrEntry = qrArray.add<JsonObject>();
@@ -428,6 +431,15 @@ void BruceConfig::fromFile(bool checkFS) {
         disabledMenus.clear();
         JsonArray dm = setting["disabledMenus"].as<JsonArray>();
         for (JsonVariant e : dm) { disabledMenus.push_back(e.as<String>()); }
+    } else {
+        count++;
+        log_e("Fail");
+    }
+
+    if (!setting["deauthWhitelist"].isNull()) {
+        deauthWhitelist.clear();
+        JsonArray dw = setting["deauthWhitelist"].as<JsonArray>();
+        for (JsonVariant e : dw) { deauthWhitelist.insert(e.as<String>()); }
     } else {
         count++;
         log_e("Fail");
@@ -867,6 +879,18 @@ void BruceConfig::removeDisabledMenu(String value) {
     auto it = std::find(disabledMenus.begin(), disabledMenus.end(), value);
     if (it == disabledMenus.end()) return;
     disabledMenus.erase(it);
+    saveFile();
+}
+
+void BruceConfig::addDeauthWhitelistMac(String value) {
+    value.toLowerCase();
+    if (!deauthWhitelist.insert(value).second) return;
+    saveFile();
+}
+
+void BruceConfig::removeDeauthWhitelistMac(String value) {
+    value.toLowerCase();
+    if (deauthWhitelist.erase(value) == 0) return;
     saveFile();
 }
 
