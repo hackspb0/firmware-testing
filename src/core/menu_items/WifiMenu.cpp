@@ -9,6 +9,7 @@
 #include "modules/ethernet/ARPScanner.h"
 #include "modules/wifi/ap_info.h"
 #include "modules/wifi/clients.h"
+#include "modules/wifi/client_scanner.h"
 #include "modules/wifi/evil_portal.h"
 #include "modules/wifi/karma_attack.h"
 #include "modules/wifi/netcut.h"
@@ -20,6 +21,9 @@
 #ifndef LITE_VERSION
 #include "modules/pwnagotchi/pwnagotchi.h"
 #include "modules/wifi/channel_analyzer.h"
+#if defined(NM_CYD_ESP32C5)
+#include "modules/wifi/dual_band_analyzer.h"
+#endif
 #include "modules/wifi/jam_detect.h"
 #include "modules/wifi/wifi_recover.h"
 #endif
@@ -65,6 +69,7 @@ void WifiMenu::optionsMenu() {
                            EvilPortal();
                        }});
     options.push_back({"NetCut", [=]() { netcutMenu(); }});
+    options.push_back({"Client Scanner", clientScannerMenu});
     // options.push_back({"ReverseShell", [=]()       { ReverseShell(); }});
 #ifndef LITE_VERSION
     options.push_back({"Listen TCP", listenTcpPort});
@@ -74,6 +79,9 @@ void WifiMenu::optionsMenu() {
     options.push_back({"SSH", lambdaHelper(ssh_setup, String(""))});
     options.push_back({"Sniffer", sniffer_setup});
     options.push_back({"Channel Analyzer", channel_analyzer_setup});
+#if defined(NM_CYD_ESP32C5)
+    options.push_back({"Dual Band Analyzer", dual_band_analyzer_setup});
+#endif
     options.push_back({"Jam Detect", jam_detect_setup});
     options.push_back({"Scan Hosts", [=]() {
                            bool doScan = true;
