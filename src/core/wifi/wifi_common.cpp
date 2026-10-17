@@ -32,6 +32,32 @@ static bool wifiHostnameMatchesConfiguration() {
     return hostname != nullptr && bruceConfig.wifiHostname == hostname;
 }
 
+static bool configureWifiStaNetwork() {
+    IPAddress anyAddress(0, 0, 0, 0);
+    if (bruceConfig.wifiDhcpEnabled) {
+        return WiFi.config(anyAddress, anyAddress, anyAddress, anyAddress, anyAddress);
+    }
+
+    IPAddress ip;
+    IPAddress gateway;
+    IPAddress subnet;
+    IPAddress dns1;
+    IPAddress dns2;
+    if (!ip.fromString(bruceConfig.wifiStaticIp) || !gateway.fromString(bruceConfig.wifiGateway) ||
+        !subnet.fromString(bruceConfig.wifiSubnet) || !dns1.fromString(bruceConfig.wifiDns1) ||
+        !dns2.fromString(bruceConfig.wifiDns2)) {
+        Serial.println("[WiFi] Invalid saved station network configuration");
+        displayError("Invalid WiFi network settings", true);
+        return false;
+    }
+    if (!WiFi.config(ip, gateway, subnet, dns1, dns2)) {
+        Serial.println("[WiFi] Failed to configure station network");
+        displayError("Failed to configure WiFi network", true);
+        return false;
+    }
+    return true;
+}
+
 static bool reconnectWithConfiguredWifiHostname(const String &ssid, const String &pwd) {
     if (!bruceConfig.wifiHostnameEnabled || wifiHostnameMatchesConfiguration()) return true;
 
@@ -40,6 +66,7 @@ static bool reconnectWithConfiguredWifiHostname(const String &ssid, const String
         vTaskDelay(100 / portTICK_PERIOD_MS);
         WiFi.mode(WIFI_MODE_STA);
         setConfiguredWifiHostname();
+        if (!configureWifiStaNetwork()) return false;
         WiFi.begin(ssid, pwd);
 
         for (uint8_t wait = 0; wait < 50 && !WiFi.isConnected(); wait++) {
@@ -147,6 +174,7 @@ bool _connectToWifiNetwork(const String &ssid, const String &pwd, int32_t channe
     padprint("Connecting to: " + ssid + ".");
     WiFi.mode(WIFI_MODE_STA);
     setConfiguredWifiHostname();
+    if (!configureWifiStaNetwork()) return false;
     RAM_LOG("wifi post-mode");
     vTaskDelay(10 / portTICK_PERIOD_MS);
     WiFi.begin(ssid.c_str(), pwd.length() > 0 ? pwd.c_str() : NULL, channel, bssid);
@@ -182,16 +210,8 @@ bool _connectToWifiNetwork(const String &ssid, const String &pwd, int32_t channe
 }
 
 bool _setupAP() {
-    IPAddress apIp;
-    IPAddress apGateway;
-    IPAddress apSubnet;
-    if (!apIp.fromString(bruceConfig.wifiApIp) || !apGateway.fromString(bruceConfig.wifiApGateway) ||
-        !apSubnet.fromString(bruceConfig.wifiApSubnet)) {
-        Serial.println("[WiFi] Invalid saved access point network configuration");
-        displayError("Invalid AP network settings", true);
-        return false;
-    }
-    if (!WiFi.softAPConfig(apIp, apGateway, apSubnet)) {
+    IPAddress apGateway(172, 0, 0, 1);
+    if (!WiFi.softAPConfig(apGateway, apGateway, IPAddress(255, 255, 255, 0))) {
         Serial.println("[WiFi] Failed to configure access point network");
         displayError("Failed to configure AP network", true);
         return false;
@@ -202,21 +222,6 @@ bool _setupAP() {
         Serial.println("[WiFi] Failed to start access point");
         displayError("Failed to start WiFi AP", true);
         return false;
-    }
-
-    if (!bruceConfig.wifiApDhcpEnabled) {
-        esp_netif_t *apNetif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
-        if (apNetif == nullptr) {
-            Serial.println("[WiFi] Failed to get access point network interface");
-            displayError("Failed to disable DHCP server", true);
-            return false;
-        }
-        esp_err_t err = esp_netif_dhcps_stop(apNetif);
-        if (err != ESP_OK) {
-            Serial.printf("[WiFi] Failed to stop DHCP server: %s\n", esp_err_to_name(err));
-            displayError("Failed to disable DHCP server", true);
-            return false;
-        }
     }
 
     wifiIP = WiFi.softAPIP().toString(); // update global var
