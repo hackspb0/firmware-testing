@@ -1388,45 +1388,44 @@ void setWifiDhcpSettingsMenu(std::function<void()> onBack) {
         String value = keyboard(currentValue, 15, prompt);
         if (value == "\x1B") return;
 
-        String ip = bruceConfig.wifiApIp;
-        String gateway = bruceConfig.wifiApGateway;
-        String subnet = bruceConfig.wifiApSubnet;
-        if (field == 0) {
-            if (gateway == ip) gateway = value;
-            ip = value;
-        } else if (field == 1) {
-            gateway = value;
-        } else {
-            subnet = value;
+        String ip = bruceConfig.wifiStaticIp;
+        String gateway = bruceConfig.wifiGateway;
+        String subnet = bruceConfig.wifiSubnet;
+        String dns1 = bruceConfig.wifiDns1;
+        String dns2 = bruceConfig.wifiDns2;
+        switch (field) {
+            case 0: ip = value; break;
+            case 1: gateway = value; break;
+            case 2: subnet = value; break;
+            case 3: dns1 = value; break;
+            default: dns2 = value; break;
         }
 
-        bool saved = bruceConfig.setWifiApNetwork(ip, gateway, subnet);
-        if (!saved && field == 0) {
-            gateway = ip;
-            saved = bruceConfig.setWifiApNetwork(ip, gateway, subnet);
-        }
-
-        if (saved) {
-            displayInfo("Saved; restart AP to apply", true);
+        if (bruceConfig.setWifiStaticNetwork(ip, gateway, subnet, dns1, dns2)) {
+            displayInfo("Saved; reconnect to WiFi to apply", true);
         } else {
-            displayError("Invalid IP, gateway or subnet", true);
+            displayError("Invalid IP, gateway, subnet or DNS", true);
         }
     };
 
     while (true) {
         bool returnToConfig = false;
         options = {
-            {"Access Point IP: " + bruceConfig.wifiApIp,
-             [=]() { editAddress(bruceConfig.wifiApIp, "Access Point IP:", 0); }},
-            {"Gateway: " + bruceConfig.wifiApGateway,
-             [=]() { editAddress(bruceConfig.wifiApGateway, "Gateway IP:", 1); }},
-            {"Subnet Mask: " + bruceConfig.wifiApSubnet,
-             [=]() { editAddress(bruceConfig.wifiApSubnet, "Subnet mask:", 2); }},
-            {String("DHCP Server: ") + (bruceConfig.wifiApDhcpEnabled ? "ON" : "OFF"),
+            {"Static IP: " + bruceConfig.wifiStaticIp,
+             [=]() { editAddress(bruceConfig.wifiStaticIp, "Static IP:", 0); }},
+            {"Gateway: " + bruceConfig.wifiGateway,
+             [=]() { editAddress(bruceConfig.wifiGateway, "Gateway IP:", 1); }},
+            {"Subnet Mask: " + bruceConfig.wifiSubnet,
+             [=]() { editAddress(bruceConfig.wifiSubnet, "Subnet mask:", 2); }},
+            {"DNS 1: " + bruceConfig.wifiDns1,
+             [=]() { editAddress(bruceConfig.wifiDns1, "DNS 1:", 3); }},
+            {"DNS 2: " + bruceConfig.wifiDns2,
+             [=]() { editAddress(bruceConfig.wifiDns2, "DNS 2:", 4); }},
+            {String("DHCP Client: ") + (bruceConfig.wifiDhcpEnabled ? "ON" : "OFF"),
              []() {
-                 bruceConfig.setWifiApDhcpEnabled(!bruceConfig.wifiApDhcpEnabled);
-                 displayInfo(String("DHCP Server: ") + (bruceConfig.wifiApDhcpEnabled ? "ON" : "OFF") +
-                                 "; restart AP to apply",
+                 bruceConfig.setWifiDhcpEnabled(!bruceConfig.wifiDhcpEnabled);
+                 displayInfo(String("DHCP Client: ") + (bruceConfig.wifiDhcpEnabled ? "ON" : "OFF") +
+                                 "; reconnect to WiFi to apply",
                              true);
              }},
             {"Device host name", setWifiHostnameMenu},
@@ -1442,7 +1441,7 @@ void setWifiDhcpSettingsMenu(std::function<void()> onBack) {
              }},
         };
 
-        int selected = loopOptions(options, MENU_TYPE_SUBMENU, "Setting DHCP");
+        int selected = loopOptions(options, MENU_TYPE_SUBMENU, "WiFi Network");
         if (selected < 0 && !returnToConfig) onBack();
         if (selected < 0 || returnToConfig) break;
     }

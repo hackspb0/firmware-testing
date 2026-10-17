@@ -3,11 +3,19 @@
 #include "sd_functions.h"
 #include <algorithm>
 
-static bool isValidWifiApNetwork(const String &ipText, const String &gatewayText, const String &subnetText) {
+static bool isValidWifiStaticNetwork(
+    const String &ipText, const String &gatewayText, const String &subnetText, const String &dns1Text,
+    const String &dns2Text
+) {
     IPAddress ip;
     IPAddress gateway;
     IPAddress subnet;
-    if (!ip.fromString(ipText) || !gateway.fromString(gatewayText) || !subnet.fromString(subnetText)) return false;
+    IPAddress dns1;
+    IPAddress dns2;
+    if (!ip.fromString(ipText) || !gateway.fromString(gatewayText) || !subnet.fromString(subnetText) ||
+        !dns1.fromString(dns1Text) || !dns2.fromString(dns2Text)) {
+        return false;
+    }
 
     uint8_t prefixLength = 0;
     bool sawZero = false;
@@ -21,6 +29,10 @@ static bool isValidWifiApNetwork(const String &ipText, const String &gatewayText
     }
 
     if (prefixLength < 1 || prefixLength > 30) return false;
+    uint32_t ipHost = static_cast<uint32_t>(ip) & ~static_cast<uint32_t>(subnet);
+    uint32_t gatewayHost = static_cast<uint32_t>(gateway) & ~static_cast<uint32_t>(subnet);
+    uint32_t broadcastHost = ~static_cast<uint32_t>(subnet);
+    if (ipHost == 0 || ipHost == broadcastHost || gatewayHost == 0 || gatewayHost == broadcastHost) return false;
     for (uint8_t octet = 0; octet < 4; octet++) {
         if ((ip[octet] & subnet[octet]) != (gateway[octet] & subnet[octet])) return false;
     }
@@ -67,10 +79,12 @@ JsonDocument BruceConfig::toJson() const {
     JsonObject _wifiAp = setting["wifiAp"].to<JsonObject>();
     _wifiAp["ssid"] = wifiAp.ssid;
     _wifiAp["pwd"] = wifiAp.pwd;
-    setting["wifiApIp"] = wifiApIp;
-    setting["wifiApGateway"] = wifiApGateway;
-    setting["wifiApSubnet"] = wifiApSubnet;
-    setting["wifiApDhcpEnabled"] = wifiApDhcpEnabled;
+    setting["wifiDhcpEnabled"] = wifiDhcpEnabled;
+    setting["wifiStaticIp"] = wifiStaticIp;
+    setting["wifiGateway"] = wifiGateway;
+    setting["wifiSubnet"] = wifiSubnet;
+    setting["wifiDns1"] = wifiDns1;
+    setting["wifiDns2"] = wifiDns2;
     setting["wifiHostname"] = wifiHostname;
     setting["wifiHostnameEnabled"] = wifiHostnameEnabled;
     setting["wifiMAC"] = wifiMAC; //@IncursioHack
@@ -91,6 +105,9 @@ JsonDocument BruceConfig::toJson() const {
 
     JsonObject _wifi = setting["wifi"].to<JsonObject>();
     for (const auto &pair : wifi) { _wifi[pair.first] = pair.second; }
+
+    JsonArray _deauthWhitelist = setting["deauthWhitelist"].to<JsonArray>();
+    for (const auto &mac : deauthWhitelist) _deauthWhitelist.add(mac);
 
     setting["startupApp"] = startupApp;
     setting["startupAppJSInterpreterFile"] = startupAppJSInterpreterFile;
@@ -316,10 +333,12 @@ void BruceConfig::fromFile(bool checkFS) {
         log_e("Fail");
     }
 
-    if (!setting["wifiApIp"].isNull()) wifiApIp = setting["wifiApIp"].as<String>();
-    if (!setting["wifiApGateway"].isNull()) wifiApGateway = setting["wifiApGateway"].as<String>();
-    if (!setting["wifiApSubnet"].isNull()) wifiApSubnet = setting["wifiApSubnet"].as<String>();
-    if (!setting["wifiApDhcpEnabled"].isNull()) wifiApDhcpEnabled = setting["wifiApDhcpEnabled"].as<bool>();
+    if (!setting["wifiDhcpEnabled"].isNull()) wifiDhcpEnabled = setting["wifiDhcpEnabled"].as<bool>();
+    if (!setting["wifiStaticIp"].isNull()) wifiStaticIp = setting["wifiStaticIp"].as<String>();
+    if (!setting["wifiGateway"].isNull()) wifiGateway = setting["wifiGateway"].as<String>();
+    if (!setting["wifiSubnet"].isNull()) wifiSubnet = setting["wifiSubnet"].as<String>();
+    if (!setting["wifiDns1"].isNull()) wifiDns1 = setting["wifiDns1"].as<String>();
+    if (!setting["wifiDns2"].isNull()) wifiDns2 = setting["wifiDns2"].as<String>();
 
     if (!setting["wifiHostname"].isNull()) {
         wifiHostname = setting["wifiHostname"].as<String>();
@@ -351,6 +370,12 @@ void BruceConfig::fromFile(bool checkFS) {
     } else {
         count++;
         log_e("Fail");
+    }
+
+    if (!setting["deauthWhitelist"].isNull()) {
+        deauthWhitelist.clear();
+        JsonArray whitelist = setting["deauthWhitelist"].as<JsonArray>();
+        for (JsonVariant entry : whitelist) deauthWhitelist.insert(entry.as<String>());
     }
 
     if (!setting["evilWifiNames"].isNull()) {
@@ -539,7 +564,7 @@ void BruceConfig::validateConfig() {
     validateEvilEndpointSsid();
     validateEvilPasswordMode();
     validateEvilGatewayIp();
-    validateWifiApNetwork();
+    validateWifiStaticNetwork();
 }
 
 void BruceConfig::setUiColor(uint16_t primary, uint16_t *secondary, uint16_t *background) {
@@ -701,33 +726,53 @@ void BruceConfig::setWifiApCreds(const String &ssid, const String &pwd) {
     saveFile();
 }
 
-bool BruceConfig::setWifiApNetwork(const String &ip, const String &gateway, const String &subnet) {
-    if (!isValidWifiApNetwork(ip, gateway, subnet)) return false;
+bool BruceConfig::setWifiStaticNetwork(
+    const String &ip, const String &gateway, const String &subnet, const String &dns1, const String &dns2
+) {
+    if (!isValidWifiStaticNetwork(ip, gateway, subnet, dns1, dns2)) return false;
 
     IPAddress parsedIp;
     IPAddress parsedGateway;
     IPAddress parsedSubnet;
+    IPAddress parsedDns1;
+    IPAddress parsedDns2;
     parsedIp.fromString(ip);
     parsedGateway.fromString(gateway);
     parsedSubnet.fromString(subnet);
-    wifiApIp = parsedIp.toString();
-    wifiApGateway = parsedGateway.toString();
-    wifiApSubnet = parsedSubnet.toString();
+    parsedDns1.fromString(dns1);
+    parsedDns2.fromString(dns2);
+    wifiStaticIp = parsedIp.toString();
+    wifiGateway = parsedGateway.toString();
+    wifiSubnet = parsedSubnet.toString();
+    wifiDns1 = parsedDns1.toString();
+    wifiDns2 = parsedDns2.toString();
     saveFile();
     return true;
 }
 
-void BruceConfig::setWifiApDhcpEnabled(bool enabled) {
-    wifiApDhcpEnabled = enabled;
+void BruceConfig::setWifiDhcpEnabled(bool enabled) {
+    wifiDhcpEnabled = enabled;
     saveFile();
 }
 
-void BruceConfig::validateWifiApNetwork() {
-    if (!isValidWifiApNetwork(wifiApIp, wifiApGateway, wifiApSubnet)) {
-        wifiApIp = "172.0.0.1";
-        wifiApGateway = "172.0.0.1";
-        wifiApSubnet = "255.255.255.0";
+void BruceConfig::validateWifiStaticNetwork() {
+    if (!isValidWifiStaticNetwork(wifiStaticIp, wifiGateway, wifiSubnet, wifiDns1, wifiDns2)) {
+        wifiStaticIp = "192.168.1.100";
+        wifiGateway = "192.168.1.1";
+        wifiSubnet = "255.255.255.0";
+        wifiDns1 = "8.8.8.8";
+        wifiDns2 = "8.8.4.4";
     }
+}
+
+void BruceConfig::addDeauthWhitelistMac(const String &mac) {
+    deauthWhitelist.insert(mac);
+    saveFile();
+}
+
+void BruceConfig::removeDeauthWhitelistMac(const String &mac) {
+    deauthWhitelist.erase(mac);
+    saveFile();
 }
 
 void BruceConfig::setWifiHostname(const String &hostname) {

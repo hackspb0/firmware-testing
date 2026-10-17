@@ -66,13 +66,16 @@ public:
     Credential webUI = {"admin", "bruce"};
     std::vector<String> webUISessions = {}; // FIFO queue of session tokens
     WiFiCredential wifiAp = {"BruceNet", "brucenet"};
-    String wifiApIp = "172.0.0.1";
-    String wifiApGateway = "172.0.0.1";
-    String wifiApSubnet = "255.255.255.0";
-    bool wifiApDhcpEnabled = true;
+    bool wifiDhcpEnabled = true;
+    String wifiStaticIp = "192.168.1.100";
+    String wifiGateway = "192.168.1.1";
+    String wifiSubnet = "255.255.255.0";
+    String wifiDns1 = "8.8.8.8";
+    String wifiDns2 = "8.8.4.4";
     String wifiHostname = "Bruce Firmware";
     bool wifiHostnameEnabled = true;
     std::map<String, String> wifi = {};
+    std::set<String> deauthWhitelist = {};
     std::set<String> evilWifiNames = {};
     String wifiMAC = ""; //@IncursioHack
     bool TerminalLog = true;
@@ -170,11 +173,14 @@ public:
     // Wifi
     void setWebUICreds(const String &usr, const String &pwd);
     void setWifiApCreds(const String &ssid, const String &pwd);
-    bool setWifiApNetwork(const String &ip, const String &gateway, const String &subnet);
-    void setWifiApDhcpEnabled(bool enabled);
-    void validateWifiApNetwork();
+    bool setWifiStaticNetwork(const String &ip, const String &gateway, const String &subnet,
+                              const String &dns1, const String &dns2);
+    void setWifiDhcpEnabled(bool enabled);
+    void validateWifiStaticNetwork();
     void setWifiHostname(const String &hostname);
     void setTerminalLog(bool value);
+    void addDeauthWhitelistMac(const String &mac);
+    void removeDeauthWhitelistMac(const String &mac);
     void addWifiCredential(const String &ssid, const String &pwd);
     void addQrCodeEntry(const String &menuName, const String &content);
     void removeQrCodeEntry(const String &menuName);
