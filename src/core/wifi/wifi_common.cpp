@@ -35,7 +35,9 @@ static bool wifiHostnameMatchesConfiguration() {
 static bool configureWifiStaNetwork() {
     IPAddress anyAddress(0, 0, 0, 0);
     if (bruceConfig.wifiDhcpEnabled) {
-        return WiFi.config(anyAddress, anyAddress, anyAddress, anyAddress, anyAddress);
+        bool configured = WiFi.config(anyAddress, anyAddress, anyAddress, anyAddress, anyAddress);
+        if (!configured) Serial.println("[WiFi] Failed to enable DHCP client");
+        return configured;
     }
 
     IPAddress ip;
@@ -55,6 +57,9 @@ static bool configureWifiStaNetwork() {
         displayError("Failed to configure WiFi network", true);
         return false;
     }
+    Serial.println("[WiFi] Static station configuration: IP=" + ip.toString() +
+                   " Gateway=" + gateway.toString() + " Subnet=" + subnet.toString() +
+                   " DNS1=" + dns1.toString() + " DNS2=" + dns2.toString());
     return true;
 }
 
@@ -144,6 +149,19 @@ bool _wifiConnect(const String &ssid, int encryption, int32_t channel, const uin
     }
 
     if (connected) {
+        if (bruceConfig.wifiDhcpEnabled) {
+            if (bruceConfig.setWifiDhcpLease(
+                    WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), WiFi.dnsIP(0), WiFi.dnsIP(1)
+                )) {
+                Serial.println("[WiFi] DHCP lease: IP=" + WiFi.localIP().toString() +
+                               " Gateway=" + WiFi.gatewayIP().toString() +
+                               " Subnet=" + WiFi.subnetMask().toString() +
+                               " DNS1=" + WiFi.dnsIP(0).toString() +
+                               " DNS2=" + WiFi.dnsIP(1).toString());
+            } else {
+                Serial.println("[WiFi] DHCP connected, but received network settings are invalid");
+            }
+        }
         wifiConnected = true;
         wifiIP = WiFi.localIP().toString();
         bruceConfig.addWifiCredential(ssid, password);
