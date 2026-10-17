@@ -182,10 +182,43 @@ bool _connectToWifiNetwork(const String &ssid, const String &pwd, int32_t channe
 }
 
 bool _setupAP() {
-    IPAddress AP_GATEWAY(172, 0, 0, 1);
-    WiFi.softAPConfig(AP_GATEWAY, AP_GATEWAY, IPAddress(255, 255, 255, 0));
+    IPAddress apIp;
+    IPAddress apGateway;
+    IPAddress apSubnet;
+    if (!apIp.fromString(bruceConfig.wifiApIp) || !apGateway.fromString(bruceConfig.wifiApGateway) ||
+        !apSubnet.fromString(bruceConfig.wifiApSubnet)) {
+        Serial.println("[WiFi] Invalid saved access point network configuration");
+        displayError("Invalid AP network settings", true);
+        return false;
+    }
+    if (!WiFi.softAPConfig(apIp, apGateway, apSubnet)) {
+        Serial.println("[WiFi] Failed to configure access point network");
+        displayError("Failed to configure AP network", true);
+        return false;
+    }
+
     setConfiguredWifiHostname();
-    WiFi.softAP(bruceConfig.wifiAp.ssid, bruceConfig.wifiAp.pwd, 6, 0, 4, false);
+    if (!WiFi.softAP(bruceConfig.wifiAp.ssid, bruceConfig.wifiAp.pwd, 6, 0, 4, false)) {
+        Serial.println("[WiFi] Failed to start access point");
+        displayError("Failed to start WiFi AP", true);
+        return false;
+    }
+
+    if (!bruceConfig.wifiApDhcpEnabled) {
+        esp_netif_t *apNetif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+        if (apNetif == nullptr) {
+            Serial.println("[WiFi] Failed to get access point network interface");
+            displayError("Failed to disable DHCP server", true);
+            return false;
+        }
+        esp_err_t err = esp_netif_dhcps_stop(apNetif);
+        if (err != ESP_OK) {
+            Serial.printf("[WiFi] Failed to stop DHCP server: %s\n", esp_err_to_name(err));
+            displayError("Failed to disable DHCP server", true);
+            return false;
+        }
+    }
+
     wifiIP = WiFi.softAPIP().toString(); // update global var
     Serial.println("IP: " + wifiIP);
     wifiConnected = true;
@@ -368,10 +401,7 @@ void wifiConnectTask(void *pvParameters) {
     for (int i = 0; i < nets; i++) {
         ssid = WiFi.SSID(i);
         pwd = bruceConfig.getWifiPassword(ssid);
-        // An empty password only means "unknown network" for secured APs: known open
-        // networks are stored with an empty password and must be joined without one.
-        bool knownOpenNet = WiFi.encryptionType(i) == WIFI_AUTH_OPEN && bruceConfig.hasWifiCredential(ssid);
-        if (pwd == "" && !knownOpenNet) continue;
+        if (pwd == "") continue;
 
         int32_t ch = WiFi.channel(i);
         uint8_t* bssid = WiFi.BSSID(i);
