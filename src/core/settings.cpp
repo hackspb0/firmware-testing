@@ -1411,6 +1411,13 @@ void setWifiDhcpSettingsMenu(std::function<void()> onBack) {
     while (true) {
         bool returnToConfig = false;
         options = {
+            {String("DHCP Client: ") + (bruceConfig.wifiDhcpEnabled ? "ON" : "OFF"),
+             []() {
+                 bruceConfig.setWifiDhcpEnabled(!bruceConfig.wifiDhcpEnabled);
+                 displayInfo(String("DHCP Client: ") + (bruceConfig.wifiDhcpEnabled ? "ON" : "OFF") +
+                                 "; reconnect to WiFi to apply",
+                             true);
+             }},
             {"Static IP: " + bruceConfig.wifiStaticIp,
              [=]() { editAddress(bruceConfig.wifiStaticIp, "Static IP:", 0); }},
             {"Gateway: " + bruceConfig.wifiGateway,
@@ -1421,13 +1428,6 @@ void setWifiDhcpSettingsMenu(std::function<void()> onBack) {
              [=]() { editAddress(bruceConfig.wifiDns1, "DNS 1:", 3); }},
             {"DNS 2: " + bruceConfig.wifiDns2,
              [=]() { editAddress(bruceConfig.wifiDns2, "DNS 2:", 4); }},
-            {String("DHCP Client: ") + (bruceConfig.wifiDhcpEnabled ? "ON" : "OFF"),
-             []() {
-                 bruceConfig.setWifiDhcpEnabled(!bruceConfig.wifiDhcpEnabled);
-                 displayInfo(String("DHCP Client: ") + (bruceConfig.wifiDhcpEnabled ? "ON" : "OFF") +
-                                 "; reconnect to WiFi to apply",
-                             true);
-             }},
             {"Device host name", setWifiHostnameMenu},
             {String("Hostname: ") + (bruceConfig.wifiHostnameEnabled ? "ON" : "OFF"),
              []() {
