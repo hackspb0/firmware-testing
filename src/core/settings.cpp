@@ -1387,6 +1387,10 @@ void setWifiDhcpSettingsMenu(std::function<void()> onBack) {
     auto editAddress = [](const String &currentValue, const String &prompt, uint8_t field) {
         String value = keyboard(currentValue, 15, prompt);
         if (value == "\x1B") return;
+        if (field == 0 && bruceConfig.wifiDhcpEnabled && !bruceConfig.wifiDhcpLeaseValid) {
+            displayError("Connect with DHCP first to detect network", true);
+            return;
+        }
 
         String ip = bruceConfig.wifiStaticIp;
         String gateway = bruceConfig.wifiGateway;
@@ -1402,7 +1406,12 @@ void setWifiDhcpSettingsMenu(std::function<void()> onBack) {
         }
 
         if (bruceConfig.setWifiStaticNetwork(ip, gateway, subnet, dns1, dns2)) {
-            displayInfo("Saved; reconnect to WiFi to apply", true);
+            if (WiFi.isConnected()) wifiDisconnect();
+            if (field == 0) {
+                displayInfo("Saved; DHCP off, reconnect to WiFi", true);
+            } else {
+                displayInfo("Saved; reconnect to WiFi to apply", true);
+            }
         } else {
             displayError("Invalid IP, gateway, subnet or DNS", true);
         }
@@ -1414,11 +1423,13 @@ void setWifiDhcpSettingsMenu(std::function<void()> onBack) {
             {String("DHCP Client: ") + (bruceConfig.wifiDhcpEnabled ? "ON" : "OFF"),
              []() {
                  bruceConfig.setWifiDhcpEnabled(!bruceConfig.wifiDhcpEnabled);
+                 if (WiFi.isConnected()) wifiDisconnect();
                  displayInfo(String("DHCP Client: ") + (bruceConfig.wifiDhcpEnabled ? "ON" : "OFF") +
-                                 "; reconnect to WiFi to apply",
+                                 (bruceConfig.wifiDhcpEnabled ? "; reconnect to learn network settings"
+                                                              : "; reconnect to use saved IP"),
                              true);
              }},
-            {"Static IP: " + bruceConfig.wifiStaticIp,
+            {"IP Address: " + bruceConfig.wifiStaticIp,
              [=]() { editAddress(bruceConfig.wifiStaticIp, "Static IP:", 0); }},
             {"Gateway: " + bruceConfig.wifiGateway,
              [=]() { editAddress(bruceConfig.wifiGateway, "Gateway IP:", 1); }},

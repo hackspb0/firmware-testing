@@ -32,7 +32,10 @@ static bool isValidWifiStaticNetwork(
     uint32_t ipHost = static_cast<uint32_t>(ip) & ~static_cast<uint32_t>(subnet);
     uint32_t gatewayHost = static_cast<uint32_t>(gateway) & ~static_cast<uint32_t>(subnet);
     uint32_t broadcastHost = ~static_cast<uint32_t>(subnet);
-    if (ipHost == 0 || ipHost == broadcastHost || gatewayHost == 0 || gatewayHost == broadcastHost) return false;
+    if (ip == gateway || ipHost == 0 || ipHost == broadcastHost || gatewayHost == 0 ||
+        gatewayHost == broadcastHost) {
+        return false;
+    }
     for (uint8_t octet = 0; octet < 4; octet++) {
         if ((ip[octet] & subnet[octet]) != (gateway[octet] & subnet[octet])) return false;
     }
@@ -80,6 +83,7 @@ JsonDocument BruceConfig::toJson() const {
     _wifiAp["ssid"] = wifiAp.ssid;
     _wifiAp["pwd"] = wifiAp.pwd;
     setting["wifiDhcpEnabled"] = wifiDhcpEnabled;
+    setting["wifiDhcpLeaseValid"] = wifiDhcpLeaseValid;
     setting["wifiStaticIp"] = wifiStaticIp;
     setting["wifiGateway"] = wifiGateway;
     setting["wifiSubnet"] = wifiSubnet;
@@ -334,6 +338,7 @@ void BruceConfig::fromFile(bool checkFS) {
     }
 
     if (!setting["wifiDhcpEnabled"].isNull()) wifiDhcpEnabled = setting["wifiDhcpEnabled"].as<bool>();
+    if (!setting["wifiDhcpLeaseValid"].isNull()) wifiDhcpLeaseValid = setting["wifiDhcpLeaseValid"].as<bool>();
     if (!setting["wifiStaticIp"].isNull()) wifiStaticIp = setting["wifiStaticIp"].as<String>();
     if (!setting["wifiGateway"].isNull()) wifiGateway = setting["wifiGateway"].as<String>();
     if (!setting["wifiSubnet"].isNull()) wifiSubnet = setting["wifiSubnet"].as<String>();
@@ -746,17 +751,40 @@ bool BruceConfig::setWifiStaticNetwork(
     wifiSubnet = parsedSubnet.toString();
     wifiDns1 = parsedDns1.toString();
     wifiDns2 = parsedDns2.toString();
+    wifiDhcpEnabled = false;
+    saveFile();
+    return true;
+}
+
+bool BruceConfig::setWifiDhcpLease(
+    const IPAddress &ip, const IPAddress &gateway, const IPAddress &subnet, const IPAddress &dns1,
+    const IPAddress &dns2
+) {
+    if (!isValidWifiStaticNetwork(
+            ip.toString(), gateway.toString(), subnet.toString(), dns1.toString(), dns2.toString()
+        )) {
+        return false;
+    }
+
+    wifiStaticIp = ip.toString();
+    wifiGateway = gateway.toString();
+    wifiSubnet = subnet.toString();
+    wifiDns1 = dns1.toString();
+    wifiDns2 = dns2.toString();
+    wifiDhcpLeaseValid = true;
     saveFile();
     return true;
 }
 
 void BruceConfig::setWifiDhcpEnabled(bool enabled) {
+    if (enabled && !wifiDhcpEnabled) wifiDhcpLeaseValid = false;
     wifiDhcpEnabled = enabled;
     saveFile();
 }
 
 void BruceConfig::validateWifiStaticNetwork() {
     if (!isValidWifiStaticNetwork(wifiStaticIp, wifiGateway, wifiSubnet, wifiDns1, wifiDns2)) {
+        wifiDhcpLeaseValid = false;
         wifiStaticIp = "192.168.1.100";
         wifiGateway = "192.168.1.1";
         wifiSubnet = "255.255.255.0";

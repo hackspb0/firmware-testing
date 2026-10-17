@@ -67,6 +67,7 @@ public:
     std::vector<String> webUISessions = {}; // FIFO queue of session tokens
     WiFiCredential wifiAp = {"BruceNet", "brucenet"};
     bool wifiDhcpEnabled = true;
+    bool wifiDhcpLeaseValid = false;
     String wifiStaticIp = "192.168.1.100";
     String wifiGateway = "192.168.1.1";
     String wifiSubnet = "255.255.255.0";
@@ -175,6 +176,8 @@ public:
     void setWifiApCreds(const String &ssid, const String &pwd);
     bool setWifiStaticNetwork(const String &ip, const String &gateway, const String &subnet,
                               const String &dns1, const String &dns2);
+    bool setWifiDhcpLease(const IPAddress &ip, const IPAddress &gateway, const IPAddress &subnet,
+                          const IPAddress &dns1, const IPAddress &dns2);
     void setWifiDhcpEnabled(bool enabled);
     void validateWifiStaticNetwork();
     void setWifiHostname(const String &hostname);
