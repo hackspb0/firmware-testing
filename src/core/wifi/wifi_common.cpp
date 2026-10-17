@@ -63,6 +63,22 @@ static bool configureWifiStaNetwork() {
     return true;
 }
 
+static bool applyConfiguredStaticWifiIp() {
+    if (bruceConfig.wifiDhcpEnabled) return true;
+    if (!configureWifiStaNetwork()) return false;
+
+    const String configuredIp = bruceConfig.wifiStaticIp;
+    const String appliedIp = WiFi.localIP().toString();
+    if (appliedIp != configuredIp) {
+        Serial.println("[WiFi] Static IP mismatch: configured=" + configuredIp + " applied=" + appliedIp);
+        displayError("Static IP not applied", true);
+        return false;
+    }
+
+    Serial.println("[WiFi] Verified static station IP: " + appliedIp);
+    return true;
+}
+
 static bool reconnectWithConfiguredWifiHostname(const String &ssid, const String &pwd) {
     if (!bruceConfig.wifiHostnameEnabled || wifiHostnameMatchesConfiguration()) return true;
 
@@ -223,6 +239,8 @@ bool _connectToWifiNetwork(const String &ssid, const String &pwd, int32_t channe
         displayError("Hostname not applied");
         return false;
     }
+
+    if (WiFi.isConnected() && !applyConfiguredStaticWifiIp()) return false;
 
     return WiFi.isConnected();
 }
