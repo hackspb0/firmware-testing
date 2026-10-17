@@ -9,12 +9,6 @@
 #include <set>
 #include <vector>
 
-// Most panels want the framebuffer inverted; boards whose panel does not
-// (e.g. the LilyGO T4 ILI9341) can override this default from their build flags.
-#ifndef DEFAULT_COLOR_INVERTED
-#define DEFAULT_COLOR_INVERTED 1
-#endif
-
 enum EvilPortalPasswordMode { FULL_PASSWORD = 0, FIRST_LAST_CHAR = 1, HIDE_PASSWORD = 2, SAVE_LENGTH = 3 };
 
 // How the main menu presents the modules:
@@ -72,13 +66,16 @@ public:
     Credential webUI = {"admin", "bruce"};
     std::vector<String> webUISessions = {}; // FIFO queue of session tokens
     WiFiCredential wifiAp = {"BruceNet", "brucenet"};
+    String wifiApIp = "172.0.0.1";
+    String wifiApGateway = "172.0.0.1";
+    String wifiApSubnet = "255.255.255.0";
+    bool wifiApDhcpEnabled = true;
     String wifiHostname = "Bruce Firmware";
     bool wifiHostnameEnabled = true;
     std::map<String, String> wifi = {};
     std::set<String> evilWifiNames = {};
     String wifiMAC = ""; //@IncursioHack
     bool TerminalLog = true;
-    std::set<String> deauthWhitelist = {}; // MACs spared by whitelist deauth, lowercase colon form
 
     // EvilPortal
     EvilPortalEndpoints evilPortalEndpoints = {"/creds", "/ssid", true, true, true};
@@ -99,8 +96,7 @@ public:
     String wigleBasicToken = "";
     String wdgwarsApiKey = "your 64-char hex key from wdgwars.pl/profile";
     int devMode = 0;
-
-    int colorInverted = DEFAULT_COLOR_INVERTED;
+    int colorInverted = 1;
     int mainMenuStyle = MAIN_MENU_CAROUSEL;
     int badUSBBLEKeyboardLayout = 0;
     uint16_t badUSBBLEKeyDelay = 10;
@@ -174,13 +170,15 @@ public:
     // Wifi
     void setWebUICreds(const String &usr, const String &pwd);
     void setWifiApCreds(const String &ssid, const String &pwd);
+    bool setWifiApNetwork(const String &ip, const String &gateway, const String &subnet);
+    void setWifiApDhcpEnabled(bool enabled);
+    void validateWifiApNetwork();
     void setWifiHostname(const String &hostname);
     void setTerminalLog(bool value);
     void addWifiCredential(const String &ssid, const String &pwd);
     void addQrCodeEntry(const String &menuName, const String &content);
     void removeQrCodeEntry(const String &menuName);
     String getWifiPassword(const String &ssid) const;
-    bool hasWifiCredential(const String &ssid) const;
     void addEvilWifiName(String value);
     void removeEvilWifiName(String value);
     void setEvilEndpointCreds(String value);
@@ -218,8 +216,6 @@ public:
     void setBadUSBBLEShowOutput(bool value);
     void addDisabledMenu(String value);
     void removeDisabledMenu(String value);
-    void addDeauthWhitelistMac(String value);
-    void removeDeauthWhitelistMac(String value);
 
     void addWebUISession(const String &token);
     void removeWebUISession(const String &token);

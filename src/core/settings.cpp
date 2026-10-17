@@ -652,9 +652,6 @@ void setRFModuleMenu() {
 #if defined(ARDUINO_M5STICK_C_PLUS) || defined(ARDUINO_M5STICK_C_PLUS2)
         if (bruceConfigPins.CC1101_bus.mosi == GPIO_NUM_26) idx = 2;
 #endif
-#ifdef CAP_CC1101_SS_PIN
-        if (bruceConfigPins.CC1101_bus.cs == (gpio_num_t)CAP_CC1101_SS_PIN) idx = 2;
-#endif
     }
 
     options = {
@@ -664,9 +661,6 @@ void setRFModuleMenu() {
         {"CC1101 (Shared SPI)", [&pins_setup]() { pins_setup = 2; }},
 #else
         {"CC1101", [&]() { result = CC1101_SPI_MODULE; }},
-#endif
-#ifdef CAP_CC1101_SS_PIN
-        {"CC1101 M5 Cap", [&pins_setup]() { pins_setup = 3; }},
 #endif
         /* WIP:
          * #ifdef USE_CC1101_VIA_PCA9554
@@ -716,27 +710,6 @@ void setRFModuleMenu() {
             );
 #endif
         }
-#ifdef CAP_CC1101_SS_PIN
-        else if (pins_setup == 3) {
-            // M5Stack Cap CC1101: shares the default SPI port with the SD card and the cap's
-            // own ST25R3916. https://docs.m5stack.com/en/cap/Cap_CC1101
-            result = CC1101_SPI_MODULE;
-            bruceConfigPins.setCC1101Pins(
-                {(gpio_num_t)SPI_SCK_PIN,
-                 (gpio_num_t)SPI_MISO_PIN,
-                 (gpio_num_t)SPI_MOSI_PIN,
-                 (gpio_num_t)CAP_CC1101_SS_PIN,
-                 (gpio_num_t)CAP_CC1101_GDO0_PIN,
-                 GPIO_NUM_NC}
-            );
-        }
-#endif
-        // initRfModule() dispatches on rfModule, so the pin presets have to already say CC1101 or
-        // it takes the single-pin path and reports success without ever probing the chip - which
-        // is the whole point of the "not found" + wiring QR below. Left alone for the plain
-        // "CC1101" entry, which is still selectable blind so the pins can be set afterwards.
-        // Not saved yet: the error path below falls back to M5_RF_MODULE and saves that instead.
-        if (pins_setup > 0) bruceConfigPins.rfModule = CC1101_SPI_MODULE;
         if (initRfModule()) {
             bruceConfigPins.setRfModule(CC1101_SPI_MODULE);
             deinitRfModule();
@@ -812,24 +785,6 @@ void setRFIDModuleMenu() {
         {"ST25R3916 I2C",
          [=]() { bruceConfigPins.setRfidModule(ST25R3916_I2C_MODULE); },
          bruceConfigPins.rfidModule == ST25R3916_I2C_MODULE},
-#ifdef CAP_NFC_SS_PIN
-        // M5Stack Cap CC1101: its NFC half is an ST25R3916 on the default SPI port.
-        // https://docs.m5stack.com/en/cap/Cap_CC1101
-        {"CC1101 M5 Cap",
-         [=]() {
-             bruceConfigPins.setSR25RPins(
-                 {(gpio_num_t)SPI_SCK_PIN,
-                  (gpio_num_t)SPI_MISO_PIN,
-                  (gpio_num_t)SPI_MOSI_PIN,
-                  (gpio_num_t)CAP_NFC_SS_PIN,
-                  (gpio_num_t)CAP_NFC_IRQ_PIN,
-                  GPIO_NUM_NC}
-             );
-             bruceConfigPins.setRfidModule(ST25R3916_SPI_MODULE);
-         },
-         bruceConfigPins.rfidModule == ST25R3916_SPI_MODULE &&
-             bruceConfigPins.ST25R_bus.cs == (gpio_num_t)CAP_NFC_SS_PIN},
-#endif
 #endif
     };
     loopOptions(options, bruceConfigPins.rfidModule);
@@ -1426,6 +1381,71 @@ void setWifiHostnameMenu() {
     bruceConfig.setWifiHostname(hostname);
     if (WiFi.getMode() != WIFI_MODE_NULL) wifiDisconnect();
     displayInfo("Device name: " + hostname, true);
+}
+
+void setWifiDhcpSettingsMenu(std::function<void()> onBack) {
+    auto editAddress = [](const String &currentValue, const String &prompt, uint8_t field) {
+        String value = keyboard(currentValue, 15, prompt);
+        if (value == "\x1B") return;
+
+        String ip = bruceConfig.wifiApIp;
+        String gateway = bruceConfig.wifiApGateway;
+        String subnet = bruceConfig.wifiApSubnet;
+        if (field == 0) {
+            if (gateway == ip) gateway = value;
+            ip = value;
+        } else if (field == 1) {
+            gateway = value;
+        } else {
+            subnet = value;
+        }
+
+        bool saved = bruceConfig.setWifiApNetwork(ip, gateway, subnet);
+        if (!saved && field == 0) {
+            gateway = ip;
+            saved = bruceConfig.setWifiApNetwork(ip, gateway, subnet);
+        }
+
+        if (saved) {
+            displayInfo("Saved; restart AP to apply", true);
+        } else {
+            displayError("Invalid IP, gateway or subnet", true);
+        }
+    };
+
+    while (true) {
+        bool returnToConfig = false;
+        options = {
+            {"Access Point IP: " + bruceConfig.wifiApIp,
+             [=]() { editAddress(bruceConfig.wifiApIp, "Access Point IP:", 0); }},
+            {"Gateway: " + bruceConfig.wifiApGateway,
+             [=]() { editAddress(bruceConfig.wifiApGateway, "Gateway IP:", 1); }},
+            {"Subnet Mask: " + bruceConfig.wifiApSubnet,
+             [=]() { editAddress(bruceConfig.wifiApSubnet, "Subnet mask:", 2); }},
+            {String("DHCP Server: ") + (bruceConfig.wifiApDhcpEnabled ? "ON" : "OFF"),
+             []() {
+                 bruceConfig.setWifiApDhcpEnabled(!bruceConfig.wifiApDhcpEnabled);
+                 displayInfo(String("DHCP Server: ") + (bruceConfig.wifiApDhcpEnabled ? "ON" : "OFF") +
+                                 "; restart AP to apply",
+                             true);
+             }},
+            {"Device host name", setWifiHostnameMenu},
+            {String("Hostname: ") + (bruceConfig.wifiHostnameEnabled ? "ON" : "OFF"),
+             []() {
+                 bruceConfig.wifiHostnameEnabled = !bruceConfig.wifiHostnameEnabled;
+                 bruceConfig.saveFile();
+             }},
+            {"Back",
+             [&]() {
+                 returnToConfig = true;
+                 onBack();
+             }},
+        };
+
+        int selected = loopOptions(options, MENU_TYPE_SUBMENU, "Setting DHCP");
+        if (selected < 0 && !returnToConfig) onBack();
+        if (selected < 0 || returnToConfig) break;
+    }
 }
 
 /*********************************************************************

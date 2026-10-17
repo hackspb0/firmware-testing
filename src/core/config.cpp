@@ -3,6 +3,30 @@
 #include "sd_functions.h"
 #include <algorithm>
 
+static bool isValidWifiApNetwork(const String &ipText, const String &gatewayText, const String &subnetText) {
+    IPAddress ip;
+    IPAddress gateway;
+    IPAddress subnet;
+    if (!ip.fromString(ipText) || !gateway.fromString(gatewayText) || !subnet.fromString(subnetText)) return false;
+
+    uint8_t prefixLength = 0;
+    bool sawZero = false;
+    for (uint8_t octet = 0; octet < 4; octet++) {
+        for (int8_t bit = 7; bit >= 0; bit--) {
+            bool set = (subnet[octet] & (1U << bit)) != 0;
+            if (!set) sawZero = true;
+            else if (sawZero) return false;
+            else prefixLength++;
+        }
+    }
+
+    if (prefixLength < 1 || prefixLength > 30) return false;
+    for (uint8_t octet = 0; octet < 4; octet++) {
+        if ((ip[octet] & subnet[octet]) != (gateway[octet] & subnet[octet])) return false;
+    }
+    return true;
+}
+
 JsonDocument BruceConfig::toJson() const {
     JsonDocument jsonDoc;
     JsonObject setting = jsonDoc.to<JsonObject>();
@@ -43,6 +67,10 @@ JsonDocument BruceConfig::toJson() const {
     JsonObject _wifiAp = setting["wifiAp"].to<JsonObject>();
     _wifiAp["ssid"] = wifiAp.ssid;
     _wifiAp["pwd"] = wifiAp.pwd;
+    setting["wifiApIp"] = wifiApIp;
+    setting["wifiApGateway"] = wifiApGateway;
+    setting["wifiApSubnet"] = wifiApSubnet;
+    setting["wifiApDhcpEnabled"] = wifiApDhcpEnabled;
     setting["wifiHostname"] = wifiHostname;
     setting["wifiHostnameEnabled"] = wifiHostnameEnabled;
     setting["wifiMAC"] = wifiMAC; //@IncursioHack
@@ -78,9 +106,6 @@ JsonDocument BruceConfig::toJson() const {
 
     JsonArray dm = setting["disabledMenus"].to<JsonArray>();
     for (int i = 0; i < disabledMenus.size(); i++) { dm.add(disabledMenus[i]); }
-
-    JsonArray dw = setting["deauthWhitelist"].to<JsonArray>();
-    for (const auto &mac : deauthWhitelist) dw.add(mac);
 
     JsonArray qrArray = setting["qrCodes"].to<JsonArray>();
     for (const auto &entry : qrCodes) {
@@ -291,6 +316,11 @@ void BruceConfig::fromFile(bool checkFS) {
         log_e("Fail");
     }
 
+    if (!setting["wifiApIp"].isNull()) wifiApIp = setting["wifiApIp"].as<String>();
+    if (!setting["wifiApGateway"].isNull()) wifiApGateway = setting["wifiApGateway"].as<String>();
+    if (!setting["wifiApSubnet"].isNull()) wifiApSubnet = setting["wifiApSubnet"].as<String>();
+    if (!setting["wifiApDhcpEnabled"].isNull()) wifiApDhcpEnabled = setting["wifiApDhcpEnabled"].as<bool>();
+
     if (!setting["wifiHostname"].isNull()) {
         wifiHostname = setting["wifiHostname"].as<String>();
     }
@@ -436,15 +466,6 @@ void BruceConfig::fromFile(bool checkFS) {
         log_e("Fail");
     }
 
-    if (!setting["deauthWhitelist"].isNull()) {
-        deauthWhitelist.clear();
-        JsonArray dw = setting["deauthWhitelist"].as<JsonArray>();
-        for (JsonVariant e : dw) { deauthWhitelist.insert(e.as<String>()); }
-    } else {
-        count++;
-        log_e("Fail");
-    }
-
     if (!setting["qrCodes"].isNull()) {
         qrCodes.clear();
         JsonArray qrArray = setting["qrCodes"].as<JsonArray>();
@@ -518,6 +539,7 @@ void BruceConfig::validateConfig() {
     validateEvilEndpointSsid();
     validateEvilPasswordMode();
     validateEvilGatewayIp();
+    validateWifiApNetwork();
 }
 
 void BruceConfig::setUiColor(uint16_t primary, uint16_t *secondary, uint16_t *background) {
@@ -679,6 +701,35 @@ void BruceConfig::setWifiApCreds(const String &ssid, const String &pwd) {
     saveFile();
 }
 
+bool BruceConfig::setWifiApNetwork(const String &ip, const String &gateway, const String &subnet) {
+    if (!isValidWifiApNetwork(ip, gateway, subnet)) return false;
+
+    IPAddress parsedIp;
+    IPAddress parsedGateway;
+    IPAddress parsedSubnet;
+    parsedIp.fromString(ip);
+    parsedGateway.fromString(gateway);
+    parsedSubnet.fromString(subnet);
+    wifiApIp = parsedIp.toString();
+    wifiApGateway = parsedGateway.toString();
+    wifiApSubnet = parsedSubnet.toString();
+    saveFile();
+    return true;
+}
+
+void BruceConfig::setWifiApDhcpEnabled(bool enabled) {
+    wifiApDhcpEnabled = enabled;
+    saveFile();
+}
+
+void BruceConfig::validateWifiApNetwork() {
+    if (!isValidWifiApNetwork(wifiApIp, wifiApGateway, wifiApSubnet)) {
+        wifiApIp = "172.0.0.1";
+        wifiApGateway = "172.0.0.1";
+        wifiApSubnet = "255.255.255.0";
+    }
+}
+
 void BruceConfig::setWifiHostname(const String &hostname) {
     wifiHostname = hostname;
     saveFile();
@@ -699,8 +750,6 @@ String BruceConfig::getWifiPassword(const String &ssid) const {
     if (it != wifi.end()) return it->second;
     return "";
 }
-
-bool BruceConfig::hasWifiCredential(const String &ssid) const { return wifi.find(ssid) != wifi.end(); }
 
 void BruceConfig::addEvilWifiName(String value) {
     evilWifiNames.insert(value);
@@ -881,18 +930,6 @@ void BruceConfig::removeDisabledMenu(String value) {
     auto it = std::find(disabledMenus.begin(), disabledMenus.end(), value);
     if (it == disabledMenus.end()) return;
     disabledMenus.erase(it);
-    saveFile();
-}
-
-void BruceConfig::addDeauthWhitelistMac(String value) {
-    value.toLowerCase();
-    if (!deauthWhitelist.insert(value).second) return;
-    saveFile();
-}
-
-void BruceConfig::removeDeauthWhitelistMac(String value) {
-    value.toLowerCase();
-    if (deauthWhitelist.erase(value) == 0) return;
     saveFile();
 }
 

@@ -95,6 +95,7 @@ void setGpsBaudrateMenu();
 void setNetworkCredsMenu();
 
 void setWifiHostnameMenu();
+void setWifiDhcpSettingsMenu(std::function<void()> onBack);
 
 void setBadUSBBLEMenu();
 void setBadUSBBLEKeyboardLayoutMenu();
